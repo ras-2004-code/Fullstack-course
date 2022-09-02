@@ -1,0 +1,22 @@
+title spa form submit
+note over browser:
+on clicking submit
+default action is
+overloaded. A new
+note is added to the 
+array and the list is
+redrawn. The new note
+is posted to the server
+end note
+browser->server: HTTP POST https://studies.cs.helsinki.fi/exampleapp/new_note_spa
+note over server:
+server saves note
+in response code 201
+message recieved
+end note
+server-->browser:json data
+note over browser:
+browser invokes event
+handler to console.log
+response from server
+end note
