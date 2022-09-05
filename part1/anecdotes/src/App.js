@@ -6,8 +6,7 @@ const Button=({onClick,text})=><button onClick={onClick}>{text}</button>
 
 const Anecdote=({anecdote})=>(
   <>
-    <p>{anecdote.text}</p>
-    <p>has {anecdote.vote} votes</p>
+    <p>{anecdote.text}<br/>has {anecdote.vote} votes</p>
   </>
 )
 
