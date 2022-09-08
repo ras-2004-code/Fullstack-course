@@ -1,6 +1,8 @@
 import Numbers from './components/Numbers'
-import { useState } from 'react'
+import Notification from './components/Notification'
+import numServices from './services/numbers'
 
+import {useState ,useEffect} from 'react'
 
 const Form=({newPerson,onChangePerson,onSubmit})=>(
   <>
@@ -19,21 +21,21 @@ const Form=({newPerson,onChangePerson,onSubmit})=>(
   </>
 )
 const Search=({search,onChangeSearch})=>(
-  <>
-  <h2>Phonebook</h2>
   <div>
     <input placeholder='Search key' value={search} onChange={onChangeSearch}/>
   </div>
-  </>
 )
 
 const App = () => {
-  const [persons, setPersons] = useState([
-    { name: 'Arto Hellas', number: '040-123456', id: 1 },
-    { name: 'Ada Lovelace', number: '39-44-5323523', id: 2 },
-    { name: 'Dan Abramov', number: '12-43-234345', id: 3 },
-    { name: 'Mary Poppendieck', number: '39-23-6423122', id: 4 }
-  ])
+  const [persons, setPersons] = useState([])
+  const [message,setMessage]=useState(null)
+  const [lastTimeout,setLastTimeout]=useState(null)
+
+  useEffect(()=>{
+    numServices.getAll().then((personsData)=>{
+      setPersons(personsData)
+    })
+  },[])
   
   const [search,setSearch] = useState('')
   
@@ -41,19 +43,37 @@ const App = () => {
 
   const onSubmit=(event)=>{
     event.preventDefault()
+
     if(newPerson.name==='' || newPerson.number===''){
-      window.alert('Name and number are both mandatory fields')
-    }
-    else if(persons.find((person)=>person.name===newPerson.name)){
-      window.alert(`${newPerson.name} is already added to phonebook`)
-    }
-    else if(persons.find((person)=>person.number===newPerson.number)){
-      window.alert(`Two people cannot have the same number`)
-    }
-    else{
-      setPersons(persons.concat(newPerson))
-      setNewPerson({name:'',number:''})
-    }
+      if(lastTimeout)clearTimeout(lastTimeout)
+      setMessage({text:'Name and number are both mandatory fields',type:false})
+      setLastTimeout(setTimeout(()=>setMessage(null),5000))
+    }else numServices.getAll().then((personData)=>{
+      if(personData.find(p=>{
+        const check=p.name.toLowerCase()===newPerson.name.toLowerCase()
+        if(check){
+          if(window.confirm(`${p.name} is already added to the phone book. Would you like to update their number?`)){
+            numServices.update(p.id,newPerson)
+            p.name=newPerson.name
+            p.number=newPerson.number
+            if(lastTimeout)clearTimeout(lastTimeout)
+            setMessage({text:`Data for ${newPerson.name} was updated`,type:true})
+            setLastTimeout(setTimeout(()=>setMessage(null),5000))
+            setPersons(personData)
+            setNewPerson({name:'',number:''})
+          }
+        }
+        return check
+      })){}
+      else
+      numServices.create(newPerson).then((newPersonData)=>{
+        if(lastTimeout)clearTimeout(lastTimeout)
+        setMessage({text:`${newPerson.name} was added to the phonebook`,type:true})
+        setLastTimeout(setTimeout(()=>setMessage(null),5000))
+        setPersons(personData.concat(newPersonData))
+        setNewPerson({name:'',number:''})
+      })
+    })
   }
   const onChangePerson=(event)=>{
     const addPerson={...newPerson}
@@ -67,16 +87,43 @@ const App = () => {
   const onChangeSearch=(event)=>{
     setSearch(event.target.value)
   }
-  let searchList=''
-  if(search){
-    searchList=persons.filter((person)=>person.name.search(new RegExp(search,'i'))>-1)
+
+  const deletePerson=(person)=>{
+    let id=person.id
+    if(window.confirm(`Delete ${person.name}?`)){
+      numServices.del(person.id).catch((err)=>{
+        if(err.response.status===404){
+          if(lastTimeout)clearTimeout(lastTimeout)
+          setMessage({text:`${person.name} was already deleted.`,type:false})
+          setTimeout(()=>setMessage(null),5000)
+        }
+        else{
+          if(lastTimeout)clearTimeout(lastTimeout)
+          setMessage({text:`There was some error while deleting ${person.name}. Please reload and try again.`,type:false})
+          setLastTimeout(setTimeout(()=>setMessage(null),5000))
+        }
+      })
+      if(lastTimeout)clearTimeout(lastTimeout)
+      setMessage({text:`Deleted information of ${person.name}`,type:true})
+      setLastTimeout(setTimeout(()=>setMessage(null),5000))
+      setPersons(persons.filter(p=>p.id!==id))
+    }
   }
-  else searchList=persons
+
+
+  let matchList=[]
+  if(search){
+    const searchList=search.split(' ').filter(k=>k!='')
+    matchList=persons.filter((person)=>searchList.some(k=>new RegExp(k,'i').test(person.name)))
+  }
+  else matchList=persons
   return (
     <div>
+      <h2>Phonebook</h2>
+      <Notification message={message}/>
       <Search search={search} onChangeSearch={onChangeSearch}/>
       <Form newPerson={newPerson} onChangePerson={onChangePerson} onSubmit={onSubmit}/>
-      <Numbers persons={searchList}/>
+      <Numbers persons={matchList} deletePerson={deletePerson}/>
     </div>
   )
 }
